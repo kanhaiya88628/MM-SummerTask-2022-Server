@@ -1,56 +1,28 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-// const multer = require("multer");
+const requireLogin = require("../middleware/requireLogin")
 
-// const storage = multer.diskStorage({
-//   destination: function (req, file, cb) {
-//     cb(null, "./uploads/");
-//   },
-//   filename: function (req, file, cb) {
-//     cb(null, new Date().toISOString() + file.originalname);
-//   },
-// });
-// const upload = multer({ storage: storage });
 
 const Article = require("../models/article");
 
-router.get("/all", (req, res, next) => {
+//get all post
+router.get("/all", (req, res, next) => { 
   Article.find()
-    // .select("name date description author views _id")
-    .exec()
-    .then((docs) => {
-      const response = {
-        count: docs.length,
-        articles: docs.map((doc) => {
-          return {
-            name: doc.name,
-            date: doc.date,
-            description: doc.description,
-            author: doc.author,
-            views: doc.views,
-            _id: doc._id,
-            request: {
-              type: "GET",
-              url: "http://localhost:3000/articles/" + doc._id,
-            },
-          };
-        }),
-      };
-      
-      res.status(200).json(response);
+  .populate("author","_id firstname")
+    .then(posts => {
+      res.json({posts})
     })
     .catch((err) => {
       console.log(err);
-      res.status(500).json({
-        error: err,
-      });
+      // res.status(500).json({
+      //   error: err,
+      // });
     });
 });
 
 router.get("/trending", (req, res, next) => {
   Article.find().sort({views:-1})
-    .exec()
     .then((docs) => {
       const response = {
         count: docs.length,
@@ -64,7 +36,7 @@ router.get("/trending", (req, res, next) => {
             _id: doc._id,
             request: {
               type: "GET",
-              url: "http://localhost:3000/articles/" + doc._id,
+              url: "http://localhost:5000/articles/" + doc._id,
             },
           };
         }),
@@ -79,55 +51,43 @@ router.get("/trending", (req, res, next) => {
       });
     });
 });
-router.post("/", (req, res, next) => {
-  const article = new Article({
-    _id: new mongoose.Types.ObjectId(),
-    name: req.body.name,
-    date: req.body.date,
-    description: req.body.description,
-    author: req.body.author,
-  });
-  article
-    .save()
-    .then((result) => {
-      console.log(result);
-      res.status(201).json({
-        message: "Article created successfully",
-        createdArticle: {
-          name: result.name,
-          date: result.date,
-          description: result.description,
-          author: result.author,
-          _id: result._id,
-          request: {
-            type: "GET",
-            url: "http://localhost:3000/articles/" + result._id,
-          },
-        },
-      });
+
+//create new post
+router.post("/createpost",requireLogin, (req, res) => {
+  const {title,body,date,pic} = req.body
+  console.log(title,body,date,pic)
+  if(!title || !body || !date || !pic){
+    return res.status(422).json({error:"please add all the fields"})
+  }
+  
+  else{
+    req.admin.password = undefined
+    const article = new Article({
+      title,
+      body,
+      date,
+      photo:pic,
+      author:req.admin
     })
-    .catch((err) => {
-      console.log(err);
-      res.status(500).json({
-        error: err,
-      });
-    });
+    article.save().then(result => {
+      res.json({article:result})
+    })
+    .catch(err => {
+      console.log(err)
+    })
+  }
+  
 });
 
 router.get("/:articleId", (req, res, next) => {
   const id = req.params.articleId;
   Article.findOneAndUpdate({ _id: id }, { $inc: { views: 1 } })
-    // .select("name date description authors views")
     .exec()
     .then((doc) => {
       console.log("From database", doc);
       if (doc) {
         res.status(200).json({
-          article: doc,
-          request: {
-            type: "GET",
-            url: "http://localhost:3000/articles/",
-          },
+          article: doc
         });
       } else {
         res.status(404).json({
@@ -142,21 +102,17 @@ router.get("/:articleId", (req, res, next) => {
 });
 
 
-router.put("/:articleId", (req, res, next) => {
+router.put("/:articleId", requireLogin, (req, res, next) => {
   const id = req.params.articleId;
   const updateOperations = {};
   for (const operations of req.body) {
     updateOperations[operations.propName] = operations.value;
   }
-  Article.updateMany({ _id: id }, { $set: updateOperations })
+  Article.updateOne({ _id: id }, { $set: updateOperations })
     .exec()
     .then((result) => {
       res.status(200).json({
-        message: "Article updated",
-        request: {
-          type: "GET",
-          url: "http://localhost:3000/articles/" + id,
-        },
+        message: "Article updated"
       });
     })
     .catch((err) => {
@@ -167,31 +123,24 @@ router.put("/:articleId", (req, res, next) => {
     });
 });
 
-router.delete("/:articleId", (req, res, next) => {
+router.delete("/:articleId", requireLogin,(req, res, next) => {
   const id = req.params.articleId;
-  Article.remove({ _id: id })
-    .exec()
-    .then((result) => {
-      res.status(200).json({
-        message: "Article deleted",
-        request: {
-          type: "POST",
-          url: "http://localhost:3000/articles",
-          body: {
-            name: "String",
-            date: "Date",
-            description: "String",
-            author: "String",
-          },
-        },
-      });
+  Article.findOne({ _id: id })
+  .populate("author","_id")
+    .exec((err,article) =>{
+      if(err || !article){
+        return res.status(422).json({error:err})
+      }
+      if(article.author._id.toString() === req.admin._id.toString()){
+        article.remove()
+        .then(result =>{
+          res.json(result)
+        }).catch(err => {
+          console.log(err)
+        })
+      }
     })
-    .catch((err) => {
-      console.log(err);
-      res.status(500).json({
-        error: err,
-      });
-    });
+    
 });
 
 router.post("/:articleId/like", (req, res, next) => {

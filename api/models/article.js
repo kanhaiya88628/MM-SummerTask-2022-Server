@@ -1,22 +1,28 @@
 const mongoose = require('mongoose');
+const {ObjectId} = mongoose.Schema.Types
 
-const articleSchema = mongoose.Schema({
-    _id: mongoose.Schema.Types.ObjectId,
-        name: {
+const articleSchema = new mongoose.Schema({
+    // _id: mongoose.Schema.Types.ObjectId,
+        title: {
             type: String,
             required: true
+        },
+        body: {
+            type: String,
+            required: true
+        },
+        photo:{
+            type:String,
+            required: true
+            
         },
         date:{
             type: Date,
             required: true
-        } ,
-        description: {
-            type: String,
-            required: true
         },
         author: {
-            type: String,
-            required: true
+            type: ObjectId,
+            ref: "Admin"
         },
         views:{
             type: Number,

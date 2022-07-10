@@ -5,13 +5,16 @@ const bodyParser = require('body-parser')
 const mongoose = require('mongoose');
 
 
+
 const articleRoutes = require('./api/routes/articles');
+const userRoutes = require('./api/routes/auth');
 
 mongoose.connect('mongodb+srv://MM-task:' + process.env.MONGO_ATLAS_PW + '@mm-task.yslmt.mongodb.net/?retryWrites=true&w=majority',{
     useNewUrlParser: true 
 })
 
 mongoose.Promise = global.Promise;
+
 
 app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({extended: false}));
@@ -27,6 +30,8 @@ app.use((req,res,next) => {
     }
     next();
 })
+
+app.use("/admin",userRoutes);
 
 app.use("/articles",articleRoutes);
 
