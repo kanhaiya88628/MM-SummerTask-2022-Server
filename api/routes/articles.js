@@ -15,41 +15,21 @@ router.get("/all", (req, res, next) => {
     })
     .catch((err) => {
       console.log(err);
-      // res.status(500).json({
-      //   error: err,
-      // });
+      
     });
 });
 
+//trending
 router.get("/trending", (req, res, next) => {
   Article.find().sort({views:-1})
-    .then((docs) => {
-      const response = {
-        count: docs.length,
-        articles: docs.map((doc) => {
-          return {
-            name: doc.name,
-            date: doc.date,
-            description: doc.description,
-            author: doc.author,
-            views: doc.views,
-            _id: doc._id,
-            request: {
-              type: "GET",
-              url: "http://localhost:5000/articles/" + doc._id,
-            },
-          };
-        }),
-      };
-
-      res.status(200).json(response);
-    })
-    .catch((err) => {
-      console.log(err);
-      res.status(500).json({
-        error: err,
-      });
-    });
+.populate("author","_id firstname")
+.then(posts => {
+  res.json({posts})
+})
+.catch((err) => {
+  console.log(err);
+  
+});  
 });
 
 //create new post
@@ -82,22 +62,31 @@ router.post("/createpost",requireLogin, (req, res) => {
 router.get("/:articleId", (req, res, next) => {
   const id = req.params.articleId;
   Article.findOneAndUpdate({ _id: id }, { $inc: { views: 1 } })
-    .exec()
-    .then((doc) => {
-      console.log("From database", doc);
-      if (doc) {
-        res.status(200).json({
-          article: doc
-        });
-      } else {
-        res.status(404).json({
-          message: "No valid entry found for the passed ID",
-        });
-      }
+    // .exec()
+    // .then((doc) => {
+    //   console.log("From database", doc);
+    //   if (doc) {
+    //     res.status(200).json({
+    //       article: doc
+    //     });
+    //   } else {
+    //     res.status(404).json({
+    //       message: "No valid entry found for the passed ID",
+    //     });
+    //   }
+    // })
+    // .catch((err) => {
+    //   console.log(err);
+    //   res.status(500).json({ error: err });
+    // });
+
+    .populate("author","_id firstname")
+    .then(posts => {
+      res.json({posts})
     })
     .catch((err) => {
       console.log(err);
-      res.status(500).json({ error: err });
+      
     });
 });
 
